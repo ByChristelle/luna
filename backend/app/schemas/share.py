@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel
 
 class ShareLinkResponse(BaseModel):
@@ -9,6 +9,7 @@ class ShareCyclePublicResponse(BaseModel):
     first_name: str
     cycle_length: int
     period_length: int
+    last_period_date: str  # ← ajout
     current_day: int
     next_period_in: int
     next_period_date_short: str

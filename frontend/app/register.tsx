@@ -1,22 +1,35 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, Pressable , ScrollView} from 'react-native';
-import { useRouter } from 'expo-router';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ImageBackground,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { useRouter, Stack } from 'expo-router';
+import { BlurView } from 'expo-blur';
+import { Ionicons } from '@expo/vector-icons';
 import Input from '../components/ui/Input';
+import PublicNavbar from '../components/ui/PublicNavbar';
 import Button from '../components/ui/Button';
 import Alert from '../components/ui/Alert';
+import Logo from '../components/ui/Logo';
+import Toast from '../components/ui/Toast';
 import { useAuthStore } from '../stores/authStore';
 import { COLORS, FONTS } from '../constants/theme';
-import Logo  from '../components/ui/Logo'
-
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register, loading, error } = useAuthStore();
+  const { register, login, loading, error } = useAuthStore();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
 
   const handleRegister = async () => {
     setFormError('');
@@ -24,93 +37,168 @@ export default function RegisterScreen() {
       setFormError('Veuillez remplir tous les champs.');
       return;
     }
-
     const result = await register({ name, email, password });
     if (result.success) {
-      router.push('/login');
+      // Connexion automatique après inscription pour obtenir le token
+      const loginResult = await login({ email, password });
+      if (loginResult.success) {
+        setToastVisible(true);
+        setTimeout(() => router.replace('/(tabs)/onboarding'), 1800);
+      }
     }
   };
 
   return (
+    <ImageBackground
+      source={require('../assets/images/backgrounds/inscription.jpg')}
+      style={styles.bg}
+      resizeMode="cover"
+    >
+      <View style={styles.overlay} />
 
-     <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      {/* Toast inscription réussie */}
+      <Toast
+        visible={toastVisible}
+        message="Inscription réussie ! Complétons ton profil 🌸"
+        type="success"
+        onHide={() => setToastVisible(false)}
+      />
+
+      {/* Masquer le header natif */}
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Navbar personnalisée */}
+      <PublicNavbar currentPage="register" />
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-    <View style={styles.container}>
-      {/* Utilisation de Sacramento pour le logo/marque */}
-      <Logo size={120}/>
-      <Text style={styles.brandTitle}>Luna</Text>
-      
-      {/* Utilisation de Poppins-Bold pour le titre de page */}
-      <Text style={styles.title}>Inscription</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Logo */}
+          <View style={styles.logoWrapper}>
+            <Logo size={70} />
+          </View>
 
-      <Alert message={formError || error || ''} type="error" />
+          {/* Carte glassmorphisme */}
+          <BlurView intensity={10} tint="light" style={styles.glassCard}>
+            <View style={styles.cardInner}>
 
-      <Input 
-        label="Nom complet" 
-        placeholder="John Doe" 
-        value={name} 
-        onChangeText={setName} 
-      />
-      <Input 
-        label="Email" 
-        placeholder="exemple@email.com" 
-        value={email} 
-        onChangeText={setEmail} 
-        keyboardType="email-address" 
-        autoCapitalize="none" 
-      />
-      <Input 
-        label="Mot de passe" 
-        placeholder="••••••••" 
-        value={password} 
-        onChangeText={setPassword} 
-        secureTextEntry 
-      />
+              <Text style={styles.title}>Inscription</Text>
+              <Text style={styles.subtitle}>Crée ton espace Luna personnalisé</Text>
 
-      <Button title="S'inscrire" onPress={handleRegister} loading={loading} />
+              <Alert message={formError || error || ''} type="error" />
 
-      <Pressable onPress={() => router.push('/login')}>
-        {/* Utilisation de Poppins-Medium pour le lien */}
-        <Text style={styles.link}>Déjà un compte ? Se connecter</Text>
-      </Pressable>
-    </View>
-    </ScrollView>
+              <Input
+                label="Nom complet"
+                placeholder="Jane Doe"
+                value={name}
+                onChangeText={setName}
+              />
+
+              <Input
+                label="Email"
+                placeholder="exemple@email.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              <Input
+                label="Mot de passe"
+                placeholder="••••••••"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+
+              <Button title="S'inscrire" onPress={handleRegister} loading={loading} />
+
+              <Pressable onPress={() => router.push('/login')}>
+                <Text style={styles.link}>
+                  Déjà un compte ?{' '}
+                  <Text style={styles.linkBold}>Se connecter</Text>
+                </Text>
+              </Pressable>
+
+            </View>
+          </BlurView>
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    padding: 20, 
-    backgroundColor: COLORS.background 
+  flex: { flex: 1 },
+  bg: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
-  brandTitle: {
-    fontFamily: FONTS.script,
-    fontSize: 48,
-    color: COLORS.primary,
-    textAlign: 'center',
-    marginBottom: 5,
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.2)',
   },
-  title: { 
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+  },
+  logoWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    marginBottom: 24,
+  },
+  glassCard: {
+    width: '100%',
+    maxWidth: 440,
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  cardInner: {
+    padding: 28,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  title: {
+    fontSize: 26,
     fontFamily: FONTS.bold,
-    fontSize: 22, 
     color: COLORS.textMain,
-    marginBottom: 20, 
-    textAlign: 'center' 
-  },
-  link: { 
-    fontFamily: FONTS.medium,
-    fontSize: 14,
-    marginTop: 20, 
-    color: COLORS.primary, 
     textAlign: 'center',
+    marginBottom: 4,
   },
-  scrollContent: { 
-    flexGrow: 1, 
-    justifyContent: 'center', 
-    paddingVertical: 10 
+  subtitle: {
+    fontSize: 14,
+    fontFamily: FONTS.regular,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  link: {
+    fontSize: 14,
+    fontFamily: FONTS.regular,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  linkBold: {
+    fontFamily: FONTS.bold,
+    color: COLORS.primary,
   },
 });

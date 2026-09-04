@@ -53,8 +53,8 @@ export const useAuthStore = create((set) => ({
 
 
   // Action à ajouter dans ton store
-  updatePeriodDate: (newDate: string) => {
-  set((state: any) => ({
+  updatePeriodDate: (newDate) => {
+  set((state) => ({
     user: {
       ...state.user,
       profile: {

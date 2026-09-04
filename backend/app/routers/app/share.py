@@ -220,5 +220,6 @@ def get_shared_cycle_public(
     # 7. Retourner la réponse publique
     return ShareCyclePublicResponse(
         first_name=first_name,
+        last_period_date=str(last_period_start),
         **cycle_data,
     )

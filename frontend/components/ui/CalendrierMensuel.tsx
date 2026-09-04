@@ -31,16 +31,34 @@ export default function CalendrierMensuel({
     if (diffDays < 0) return { bg: 'transparent', color: '#999999', isPeriod: false, isFertile: false };
 
     const cycleDay = (diffDays % cycleLength) + 1;
-    const ovuStart = Math.round(cycleLength * 0.46);
-    const ovuEnd = Math.round(cycleLength * 0.57);
 
+    // Règles : du jour 1 jusqu'à periodLength
     if (cycleDay <= periodLength) {
       return { bg: '#E85A71', color: '#FFFFFF', isPeriod: true, isFertile: false };
     }
-    if (cycleDay >= ovuStart && cycleDay <= ovuEnd) {
-      return { bg: '#FF9EAA', color: '#FFFFFF', isPeriod: false, isFertile: true };
+
+    // Ovulation : cycleLength - 14
+    const ovulationDay = cycleLength - 14;
+
+    // Période féconde : 3 jours avant ovulation + jour ovulation + 2 jours après = 6 jours
+    const fertilityStart = ovulationDay - 3;
+    const fertilityEnd = ovulationDay + 2;
+
+    if (cycleDay >= fertilityStart && cycleDay <= fertilityEnd) {
+      return { bg: '#87CEEB', color: '#FFFFFF', isPeriod: false, isFertile: true };
     }
+
     return { bg: '#F8F9FA', color: '#2B2B2B', isPeriod: false, isFertile: false };
+  };
+
+  const handleDayPress = (day: number) => {
+    console.log('[CalendrierMensuel] Tap sur jour:', day);
+    const selectedDate = new Date(currentYear, currentMonth, day);
+    if (onSelectDate) {
+      onSelectDate(selectedDate);
+    } else {
+      console.warn('[CalendrierMensuel] onSelectDate non défini !');
+    }
   };
 
   return (
@@ -68,12 +86,13 @@ export default function CalendrierMensuel({
           return (
             <Pressable
               key={day}
-              style={[
+              style={({ pressed }) => [
                 styles.dayCell,
                 { backgroundColor: styleInfo.bg },
                 isToday && styles.todayBorder,
+                pressed && styles.pressed,
               ]}
-              onPress={() => onSelectDate?.(new Date(currentYear, currentMonth, day))}
+              onPress={() => handleDayPress(day)}
             >
               <Text
                 style={[
@@ -89,14 +108,14 @@ export default function CalendrierMensuel({
         })}
       </View>
 
-      {/* Légende minimaliste */}
+      {/* Légende */}
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
           <View style={[styles.dot, { backgroundColor: '#E85A71' }]} />
           <Text style={styles.legendLabel}>Règles</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.dot, { backgroundColor: '#FF9EAA' }]} />
+          <View style={[styles.dot, { backgroundColor: '#87CEEB' }]} />
           <Text style={styles.legendLabel}>Période féconde</Text>
         </View>
       </View>
@@ -129,7 +148,7 @@ const styles = StyleSheet.create({
   },
   weekDaysRow: {
     flexDirection: 'row',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
   weekDayText: {
@@ -143,18 +162,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    justify: 'flex-start',
   },
   dayCell: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
   },
   todayBorder: {
     borderWidth: 2,
     borderColor: '#2B2B2B',
+  },
+  pressed: {
+    opacity: 0.6,
   },
   dayText: {
     fontSize: 14,
@@ -165,7 +186,7 @@ const styles = StyleSheet.create({
   },
   legendRow: {
     flexDirection: 'row',
-    justify: 'center',
+    justifyContent: 'center',
     gap: 20,
     marginTop: 20,
     paddingTop: 12,

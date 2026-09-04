@@ -1,105 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import CycleCirculaire from '../../components/ui/CycleCirculaire';
 import { COLORS } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
-import { useCycleStore } from '../../stores/cycleStore';
 import { styles } from './SuiviScreen.styles';
 import ShareLinkModal from '../../components/ui/ShareLinkModal';
-import api from '../../services/api';
-
-const PHASE_LABELS = {
-  menstruelle: 'Règles',
-  folliculaire: 'Folliculaire',
-  ovulation: 'Ovulation',
-  luteale: 'Lutéale',
-};
+import { useCycleHistoryStore } from '../../stores/cycleHistoryStore';
+import { useCycleStore, computeCycleData } from '../../stores/cycleStore';
+import CycleDashboard, { CycleData } from '../../components/ui/CycleDashboard';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
-
-  // Store du cycle pour l'utilisatrice CONNECTÉE (vraies données)
   const { data: storeCycleData, loading: storeLoading, error: storeError, fetchCycle } = useCycleStore();
-
-  // 1. Récupération du token de partage éventuel depuis l'URL (ex: /home?token=xxx)
+  const { latestCycle, fetchLatestCycle } = useCycleHistoryStore();
   const { token } = useLocalSearchParams<{ token?: string }>();
 
-  // États pour la gestion du mode invité et le chargement des données
   const [isGuest, setIsGuest] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Modale de partage
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [userName, setUserName] = useState<string>('Chérie');
 
-  // Nom par défaut de la dame
-  const [guestName, setGuestName] = useState<string>('Chérie');
+  // Données du cycle en mode invité (remplies depuis l'API publique)
+  const [guestCycleData, setGuestCycleData] = useState<CycleData | null>(null);
 
-  // Données du cycle pour le mode INVITÉ (écrasées par l'API si token présent)
-  const [cycleData, setCycleData] = useState({
-    cycleLength: 28,
-    periodLength: 5,
-    currentDay: 1,
-    nextPeriodIn: 27,
-    nextPeriodDateShort: '21 sept.',
-    ovulationIn: 12,
-    ovulationDateShort: '8 sept.',
-    phase: 'folliculaire',
-    fertilityStartDateShort: '3 sept.',
-    fertilityEndDateShort: '9 sept.',
-    fertilityIn: 8,
-    isFertilityWindow: false,
-  });
-
-  // 2. Détection du mode (Invité vs Connectée) au chargement
+  // Chargement au montage
   useEffect(() => {
     if (token) {
       fetchSharedData(token);
     } else {
       setIsGuest(false);
-      // Ici, si l'utilisatrice est connectée, tu gardes son prénom
       const name = (user as any)?.first_name || (user as any)?.name || (user as any)?.email?.split?.('@')?.[0] || 'Chérie';
-      setGuestName(name);
-      // On va chercher les VRAIES données de son cycle
+      setUserName(name);
       fetchCycle();
+      fetchLatestCycle();
     }
   }, [token]);
 
-  // 3. Fonction pour récupérer les données partagées du backend (FastAPI)
+  // Récupération des données partagées (mode invité)
   const fetchSharedData = async (shareToken: string) => {
     setLoading(true);
     setError(null);
     try {
       setIsGuest(true);
-      // Appel à ton endpoint public FastAPI
-      const response = await fetch(`http://localhost:8000/share/${shareToken}`);
-
-      if (!response.ok) {
-        throw new Error('Ce lien de partage est invalide ou a expiré.');
-      }
-
+      const response = await fetch(`http://localhost:8000/api/share/${shareToken}`);
+      if (!response.ok) throw new Error('Ce lien de partage est invalide ou a expiré.');
       const data = await response.json();
 
-      // Mise à jour du nom et des métriques du cycle avec les données reçues
-      if (data.first_name) setGuestName(data.first_name);
-      setCycleData({
-        cycleLength: data.cycle_length || 28,
-        periodLength: data.period_length || 5,
-        currentDay: data.current_day || 1,
-        nextPeriodIn: data.next_period_in || 27,
-        nextPeriodDateShort: data.next_period_date_short || '21 sept.',
-        ovulationIn: data.ovulation_in || 12,
-        ovulationDateShort: data.ovulation_date_short || '8 sept.',
-        phase: data.phase || 'folliculaire',
-        fertilityStartDateShort: data.fertility_start_date_short || '3 sept.',
-        fertilityEndDateShort: data.fertility_end_date_short || '9 sept.',
-        fertilityIn: data.fertility_in || 8,
-        isFertilityWindow: !!data.is_fertility_window,
-      });
+      if (data.first_name) setUserName(data.first_name);
+
+      // On recalcule depuis la même fonction que le mode connecté
+      const computed = computeCycleData(
+        data.last_period_date,
+        data.cycle_length || 28,
+        data.period_length || 5
+      );
+      setGuestCycleData(computed as CycleData);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -107,56 +66,24 @@ export default function HomeScreen() {
     }
   };
 
-  // 4. Données affichées : store (vraies données) si connectée, sinon état local (invité)
-  const displayCycle = !isGuest && storeCycleData ? storeCycleData : cycleData;
+  // Données à afficher — même logique pour les deux modes
+  const displayCycle = useMemo((): CycleData | null => {
+    if (isGuest) return guestCycleData;
+
+    const effectiveLastPeriodDate = latestCycle?.period_start_date || storeCycleData?.lastPeriodDate;
+    const cycleLength = storeCycleData?.cycleLength || 28;
+    const periodLength = storeCycleData?.periodLength || 5;
+
+    if (effectiveLastPeriodDate) {
+      return computeCycleData(effectiveLastPeriodDate, cycleLength, periodLength) as CycleData;
+    }
+
+    return (storeCycleData as CycleData) || null;
+  }, [isGuest, guestCycleData, latestCycle, storeCycleData]);
 
   const isLoading = isGuest ? loading : loading || storeLoading;
   const displayError = isGuest ? error : error || storeError;
 
-  const quickStats = [
-    {
-      icon: 'water-outline',
-      label: 'Prochaines règles',
-      value: displayCycle.nextPeriodDateShort,
-      subValue: `dans ${displayCycle.nextPeriodIn} j.`,
-      color: COLORS.primary,
-      bg: COLORS.primaryLight,
-    },
-    {
-      icon: 'sparkles-outline',
-      label: 'Ovulation',
-      value: displayCycle.ovulationDateShort,
-      subValue: displayCycle.ovulationIn > 0
-        ? `dans ${displayCycle.ovulationIn} j.`
-        : 'En cours',
-      color: '#D98F7A',
-      bg: '#FBE9DF',
-    },
-    {
-      icon: 'flame-outline',
-      label: 'Période fertile',
-      value: displayCycle.isFertilityWindow
-        ? 'En cours 🔥'
-        : `${displayCycle.fertilityStartDateShort} → ${displayCycle.fertilityEndDateShort}`,
-      subValue: displayCycle.isFertilityWindow
-        ? 'Haute probabilité'
-        : displayCycle.fertilityIn > 0
-          ? `dans ${displayCycle.fertilityIn} j.`
-          : 'Bientôt',
-      color: '#E85D75',
-      bg: '#FCE4E8',
-    },
-    {
-      icon: 'heart-outline',
-      label: 'Phase actuelle',
-      value: PHASE_LABELS[displayCycle.phase as keyof typeof PHASE_LABELS] || 'Folliculaire',
-      subValue: `Jour ${displayCycle.currentDay} / ${displayCycle.cycleLength}`,
-      color: '#A78FB5',
-      bg: '#ECE1F3',
-    },
-  ];
-
-  // Affichage du loader tant que les données (invité ou connectée) sont en cours de chargement
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -166,15 +93,22 @@ export default function HomeScreen() {
     );
   }
 
-  // Affichage d'un message d'erreur si le token est invalide/expiré ou si le cycle n'a pas pu être chargé
   if (displayError) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-        <Ionicons name="alert-circle-outline" size={48} color="#E53E3E" />
-        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#E53E3E', marginTop: 10 }}>
-          {isGuest ? 'Lien Invalide' : 'Erreur'}
+        <Ionicons name="alert-circle-outline" size={48} color={COLORS.primary} />
+        <Text style={{ fontSize: 18, fontFamily: 'Poppins-Bold', color: COLORS.textMain, marginTop: 10 }}>
+          {isGuest ? 'Lien Invalide' : 'Profil incomplet'}
         </Text>
-        <Text style={{ textAlign: 'center', color: '#666', marginTop: 5 }}>{displayError}</Text>
+        <Text style={{ textAlign: 'center', color: COLORS.textMuted, marginTop: 5 }}>{displayError}</Text>
+        {!isGuest && (
+          <Pressable
+            onPress={() => router.push('/(tabs)/onboarding')}
+            style={{ marginTop: 20, backgroundColor: COLORS.primary, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 20 }}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>Compléter mon profil</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -186,13 +120,12 @@ export default function HomeScreen() {
         contentContainerStyle={styles.screenContent}
         showsVerticalScrollIndicator={false}
       >
-
-        {/* ===== BANNIÈRE DISCRÈTE (UNISSEMENT POUR LE MODE INVITÉ) ===== */}
+        {/* ===== BANNIÈRE MODE INVITÉ ===== */}
         {isGuest && (
           <View style={{ backgroundColor: '#FEF3C7', padding: 12, borderRadius: 8, marginBottom: 15, flexDirection: 'row', alignItems: 'center' }}>
             <Ionicons name="eye-outline" size={20} color="#92400E" style={{ marginRight: 8 }} />
             <Text style={{ color: '#92400E', fontSize: 13, flex: 1 }}>
-              Vous consultez le suivi partagé de <Text style={{ fontWeight: 'bold' }}>{guestName}</Text> (Mode lecture seule).
+              Vous consultez le suivi partagé de <Text style={{ fontWeight: 'bold' }}>{userName}</Text> (Mode lecture seule).
             </Text>
           </View>
         )}
@@ -200,30 +133,21 @@ export default function HomeScreen() {
         {/* ===== EN-TÊTE ===== */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {guestName.charAt(0).toUpperCase()}
-              </Text>
+            {/* <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
             </View>
             <View style={{ marginLeft: 10 }}>
               <Text style={styles.helloText}>{isGuest ? 'Suivi de' : 'Bonjour,'}</Text>
-              <Text style={styles.nameText}>{guestName} 💕</Text>
-            </View>
+              <Text style={styles.nameText}>{userName} 💕</Text>
+            </View> */}
           </View>
 
-          {/* Actions d'en-tête (Affichées uniquement pour l'utilisatrice connectée) */}
           {!isGuest && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              {/* Bouton pour ouvrir la modale de partage */}
               <Pressable onPress={() => setShareModalVisible(true)}>
                 <Ionicons name="share-social-outline" size={22} color={COLORS.textMain} />
               </Pressable>
-
-              {/* Bouton Notifications */}
-              <Pressable
-                style={styles.notifBtn}
-                onPress={() => router.push('/calendar')}
-              >
+              <Pressable style={styles.notifBtn} onPress={() => router.push('/notifications')}>
                 <Ionicons name="notifications-outline" size={22} color={COLORS.textMain} />
                 <View style={styles.notifDot} />
               </Pressable>
@@ -231,7 +155,7 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Modale de partage (Accessible uniquement par l'utilisatrice) */}
+        {/* Modale de partage */}
         {!isGuest && (
           <ShareLinkModal
             visible={shareModalVisible}
@@ -239,68 +163,29 @@ export default function HomeScreen() {
           />
         )}
 
-        {/* ===== CYCLE CIRCULAIRE ===== */}
-        <View style={styles.cycleCard}>
-          <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitle}>Cycle en cours</Text>
-
-            {/* Le bouton "Détails" est masqué pour l'invité */}
-            {!isGuest && (
-              <Pressable
-                onPress={() => router.push('/calendar')}
-                style={styles.seeMoreBtn}
-              >
-                <Text style={styles.seeMoreText}>Détails</Text>
-                <Ionicons name="chevron-forward" size={14} color={COLORS.primary} />
-              </Pressable>
-            )}
-          </View>
-
-          <CycleCirculaire
-            cycleLength={displayCycle.cycleLength}
-            periodLength={displayCycle.periodLength}
-            currentDay={displayCycle.currentDay}
+        {/* ===== DASHBOARD COMMUN (connectée + invitée) ===== */}
+        {displayCycle && (
+          <CycleDashboard
+            cycleData={displayCycle}
+            userName={userName}
+            isGuest={isGuest}
+            lastPeriodDate={latestCycle?.period_start_date || displayCycle.lastPeriodDate}
           />
-        </View>
+        )}
 
-        {/* ===== STATS RAPIDES ===== */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>Aujourd'hui</Text>
-          <View style={styles.statsGrid}>
-            {quickStats.map((s, i) => (
-              <View key={i} style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: s.bg }]}>
-                  <Ionicons name={s.icon as any} size={20} color={s.color} />
-                </View>
-                <Text style={styles.statLabel}>{s.label}</Text>
-                <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
-                {s.subValue && (
-                  <Text style={styles.statSubValue}>{s.subValue}</Text>
-                )}
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* ===== RACCOURCIS (Masqués en Mode Invité) ===== */}
+        {/* ===== RACCOURCIS (mode connecté uniquement) ===== */}
         {!isGuest && (
           <View style={styles.shortcutsSection}>
             <Text style={styles.sectionTitle}>Raccourcis</Text>
             <View style={styles.shortcutsRow}>
-              <Pressable
-                style={styles.shortcutBtn}
-                onPress={() => router.push('/calendar')}
-              >
+              <Pressable style={styles.shortcutBtn} onPress={() => router.push('/calendar')}>
                 <View style={[styles.shortcutIcon, { backgroundColor: COLORS.primaryLight }]}>
                   <Ionicons name="add" size={26} color={COLORS.primary} />
                 </View>
                 <Text style={styles.shortcutLabel}>Noter ma journée</Text>
               </Pressable>
 
-              <Pressable
-                style={styles.shortcutBtn}
-                onPress={() => router.push('/ai')}
-              >
+              <Pressable style={styles.shortcutBtn} onPress={() => router.push('/ai')}>
                 <View style={[styles.shortcutIcon, { backgroundColor: '#ECE1F3' }]}>
                   <Ionicons name="chatbubble-ellipses-outline" size={24} color={COLORS.ai} />
                 </View>

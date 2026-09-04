@@ -46,6 +46,14 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "groqApiKey":  "process.env.EXPO_PUBLIC_GROQ_API_KEY",
+      "router": {},
+      "eas": {
+        "projectId": "8fb47a48-0e07-435d-8293-0813ba1f9128"
+      }
+    },
+    "owner": "christelleoronk"
   }
 }

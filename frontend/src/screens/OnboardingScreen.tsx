@@ -58,15 +58,14 @@ export default function OnboardingScreen() {
   const progressPercent: `${number}%` = `${(step / totalSteps) * 100}%`;
 
   const handleSubmit = async () => {
-    // 1. Envoi au backend FastAPI via le Store
     const res = await submitOnboarding(formData);
+    console.log('[Onboarding] résultat:', res);
 
     if (res.success) {
-      // 2. Marquer l'onboarding comme effectué en local
       await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
-
-      // 3. Redirection vers le Dashboard / Tabs
       router.replace('/(tabs)');
+    } else {
+      console.log('[Onboarding] erreur soumission');
     }
   };
 

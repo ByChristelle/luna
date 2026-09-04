@@ -14,3 +14,7 @@ class User(Base):
     share_token = Column(String(255), nullable=True, unique=True, index=True)
 
     profile = relationship("Profile", back_populates="user", uselist=False)
+    cycles=relationship("Cycle" , back_populates="user")
+    messages = relationship("Message", back_populates="user")
+    push_tokens = relationship("PushToken", back_populates="user")
+    notification_preferences = relationship("NotificationPreference", back_populates="user", uselist=False)

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import api from '../services/api';
+import axios from 'axios';
+import { useAuthStore } from './authStore';
 
 export const useOnboardingStore = create((set) => ({
   loading: false,
@@ -8,23 +9,36 @@ export const useOnboardingStore = create((set) => ({
   submitOnboarding: async (formData) => {
     set({ loading: true, error: null });
     try {
-      const response = await api.post('/profiles/onboarding', {
-        goal: formData.goal,
-        age: parseInt(formData.age, 10),
-        last_period_date: formData.lastPeriod,
-        cycle_length: formData.cycleLength,
-        period_length: formData.periodLength,
-        is_regular: 'true',
-        flow: formData.flow,
-        symptoms: JSON.stringify(formData.symptoms),
-      });
+      const token = useAuthStore.getState().token;
+      console.log('[onboardingStore] token:', token ? 'présent' : 'absent');
+
+      const response = await axios.post(
+        'http://127.0.0.1:8000/api/profiles/onboarding',
+        {
+          goal: formData.goal,
+          age: parseInt(formData.age, 10),
+          last_period_date: formData.lastPeriod,
+          cycle_length: formData.cycleLength,
+          period_length: formData.periodLength,
+          is_regular: 'true',
+          flow: formData.flow,
+          symptoms: JSON.stringify(formData.symptoms),
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       set({ loading: false });
       return { success: true, data: response.data };
     } catch (err) {
-      set({ 
-        loading: false, 
-        error: err.response?.data?.detail || "Erreur lors de l'enregistrement" 
+      console.log('[onboardingStore] erreur:', err.response?.status, err.response?.data);
+      set({
+        loading: false,
+        error: err.response?.data?.detail || "Erreur lors de l'enregistrement",
       });
       return { success: false };
     }

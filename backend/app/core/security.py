@@ -11,13 +11,14 @@ from sqlalchemy.orm import Session
 from app.models.user import User
 
 load_dotenv()
-SECRET_KEY = os.getenv("SECRET_KEY", "fallback_secret_key_pour_dev")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+from app.core.config import settings
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 
 # Pour le chiffrement
-KEY = os.getenv("SECRET_KEY_ENCRYPTION").encode()
+KEY = settings.SECRET_KEY_ENCRYPTION.strip().encode()
 fernet = Fernet(KEY)
 
 

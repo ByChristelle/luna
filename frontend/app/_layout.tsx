@@ -4,7 +4,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
-
+import { useNotificationStore } from '../stores/notificationStore';
 
 import { 
   useFonts, 
@@ -19,6 +19,9 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const { registerToken } = useNotificationStore();
+
+
 
   const [loaded, error] = useFonts({
     'Poppins-Regular': Poppins_400Regular,
@@ -26,10 +29,11 @@ export default function RootLayout() {
     'Poppins-Bold': Poppins_700Bold,
     'Sacramento': Sacramento_400Regular,
   });
-
+  
   useEffect(() => {
     if (loaded || error) {
       SplashScreen.hideAsync();
+      registerToken(); // Enregistre le token dès que l'app démarre
     }
   }, [loaded, error]);
 

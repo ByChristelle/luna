@@ -38,26 +38,25 @@ export const computeCycleData = (lastPeriodDate, cycleLength, periodLength) => {
     currentDay = (daysSinceLast % cycleLength) + 1;
   }
 
-  // 3) Phase actuelle
-  let phase = 'menstruelle';
-  const ovuStart = Math.round(cycleLength * 0.46); // ~jour 13
-  const ovuEnd = Math.round(cycleLength * 0.57);   // ~jour 16
+  // 3) Phase actuelle — alignée avec CycleCirculaire et CalendrierMensuel
+  const ovulationDay = cycleLength - 14;
+  const fertilityStartDay = Math.max(1, ovulationDay - 3);
+  const fertilityEndDay = Math.min(cycleLength, ovulationDay + 2);
+
+  let phase = 'luteale';
   if (currentDay <= periodLength) phase = 'menstruelle';
-  else if (currentDay < ovuStart) phase = 'folliculaire';
-  else if (currentDay <= ovuEnd) phase = 'ovulation';
-  else phase = 'luteale';
+  else if (currentDay < fertilityStartDay) phase = 'folliculaire';
+  else if (currentDay <= fertilityEndDay) phase = 'ovulation';
 
   // 4) Prochaines règles dans X jours
   let nextPeriodIn = cycleLength - currentDay + 1;
   if (nextPeriodIn < 1) nextPeriodIn = 1;
 
   // 5) Ovulation dans X jours
-  //    L'ovulation a lieu ~14 jours avant la FIN du cycle
-  const ovulationDay = cycleLength - 14;
   let ovulationIn = 0;
   if (currentDay < ovulationDay) ovulationIn = ovulationDay - currentDay;
-  else if (currentDay <= ovuEnd) ovulationIn = 0; // en cours
-  else ovulationIn = cycleLength - currentDay + ovulationDay; // prochain cycle
+  else if (currentDay <= fertilityEndDay) ovulationIn = 0;
+  else ovulationIn = cycleLength - currentDay + ovulationDay;
 
   // Nombre de cycles COMPLETS déjà écoulés depuis la date de début
   const cyclesElapsed = Math.floor(daysSinceLast / cycleLength);
@@ -66,21 +65,20 @@ export const computeCycleData = (lastPeriodDate, cycleLength, periodLength) => {
   const nextPeriodDate = new Date(start);
   nextPeriodDate.setDate(start.getDate() + (cyclesElapsed + 1) * cycleLength);
 
-  // 7) PÉRIODE DE FÉCONDITÉ : 5 jours avant ovulation + 1 jour après
-  const fertilityStartDay = Math.max(1, ovulationDay - 5);
-  const fertilityEndDay = Math.min(cycleLength, ovulationDay + 1);
+  // 7) PÉRIODE DE FÉCONDITÉ : 3 jours avant ovulation + 2 jours après = 6 jours
+  // fertilityStartDay et fertilityEndDay déjà calculés dans la phase ci-dessus
 
   const fertilityStartDate = new Date(start);
-  fertilityStartDate.setDate(start.getDate() + fertilityStartDay - 1 + cyclesElapsed * cycleLength);
+  fertilityStartDate.setDate(start.getDate() + fertilityStartDay + cyclesElapsed * cycleLength);
 
   const fertilityEndDate = new Date(start);
-  fertilityEndDate.setDate(start.getDate() + fertilityEndDay - 1 + cyclesElapsed * cycleLength);
+  fertilityEndDate.setDate(start.getDate() + fertilityEndDay + cyclesElapsed * cycleLength);
 
   // Date exacte de l'ovulation (cycle en cours)
   const ovulationDate = new Date(start);
-  ovulationDate.setDate(start.getDate() + ovulationDay - 1 + cyclesElapsed * cycleLength);
+  ovulationDate.setDate(start.getDate() + ovulationDay + cyclesElapsed * cycleLength);
 
-  // 9) Calcul : dans combien de jours la fenêtre fertile commence / si on est dedans
+  // Dans combien de jours la fenêtre fertile commence
   const isFertilityWindow = currentDay >= fertilityStartDay && currentDay <= fertilityEndDay;
   let fertilityIn = 0;
   if (isFertilityWindow) {
@@ -88,7 +86,6 @@ export const computeCycleData = (lastPeriodDate, cycleLength, periodLength) => {
   } else if (currentDay < fertilityStartDay) {
     fertilityIn = fertilityStartDay - currentDay;
   } else {
-    // On a dépassé la fenêtre, c'est au prochain cycle
     fertilityIn = cycleLength - currentDay + fertilityStartDay;
   }
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../../constants/theme';
 
@@ -8,25 +8,23 @@ const { width } = Dimensions.get('window');
 interface CalendrierCirculaireProps {
   periodLength?: number;
   cycleLength?: number;
-  lastPeriodDate?: Date; // Date du premier jour des dernières règles
-  onSelectDay?: (date: Date) => void;
+  lastPeriodDate?: Date;
 }
 
 const PHASE_COLORS = {
-  menstruelle: { base: '#B8526C', label: 'Règles', emoji: '🩸' },
-  folliculaire: { base: '#E8A5B9', label: 'Phase folliculaire', emoji: '🌸' },
-  ovulation: { base: '#D98F7A', label: 'Ovulation', emoji: '✨' },
-  luteale: { base: '#A78FB5', label: 'Phase lutéale', emoji: '🌙' },
+  menstruelle: { base: '#E85A71', label: 'Règles', emoji: '🩸' },
+  folliculaire: { base: '#FFFFFF', label: 'Phase folliculaire', emoji: '🌸' },
+  ovulation: { base: '#87CEEB', label: 'Période féconde', emoji: '✨' },
+  luteale: { base: '#FFFFFF', label: 'Phase lutéale', emoji: '🌙' },
 };
 
 const CalendrierCirculaire: React.FC<CalendrierCirculaireProps> = ({
   periodLength = 5,
   cycleLength = 28,
   lastPeriodDate = new Date(),
-  onSelectDay,
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const today = new Date();
 
   // Navigation des mois
   const changeMonth = (direction: number) => {
@@ -42,13 +40,15 @@ const CalendrierCirculaire: React.FC<CalendrierCirculaireProps> = ({
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     const dayOfCycle = ((diffDays % cycleLength) + cycleLength) % cycleLength + 1;
 
-    const ovuStart = Math.round(cycleLength * 0.46);
-    const ovuEnd = Math.round(cycleLength * 0.57);
+    // Ovulation = cycleLength - 14, période féconde = 3 avant + 2 après
+    const ovulationDay = cycleLength - 14;
+    const fertilityStart = ovulationDay - 3;
+    const fertilityEnd = ovulationDay + 2;
 
     let phase = { key: 'luteale', ...PHASE_COLORS.luteale };
     if (dayOfCycle <= periodLength) phase = { key: 'menstruelle', ...PHASE_COLORS.menstruelle };
-    else if (dayOfCycle < ovuStart) phase = { key: 'folliculaire', ...PHASE_COLORS.folliculaire };
-    else if (dayOfCycle <= ovuEnd) phase = { key: 'ovulation', ...PHASE_COLORS.ovulation };
+    else if (dayOfCycle >= fertilityStart && dayOfCycle <= fertilityEnd) phase = { key: 'ovulation', ...PHASE_COLORS.ovulation };
+    else if (dayOfCycle < fertilityStart) phase = { key: 'folliculaire', ...PHASE_COLORS.folliculaire };
 
     return { dayOfCycle, phase };
   };
@@ -65,25 +65,25 @@ const CalendrierCirculaire: React.FC<CalendrierCirculaireProps> = ({
   const center = containerSize / 2;
   const angleStep = (2 * Math.PI) / totalDaysInMonth;
 
-  // Données du jour sélectionné au centre
-  const { dayOfCycle, phase } = getPhaseDataForDate(selectedDate);
+  // Données du jour actuel au centre
+  const { dayOfCycle, phase } = getPhaseDataForDate(today);
   const daysUntilNext = dayOfCycle <= periodLength ? periodLength - dayOfCycle + 1 : cycleLength - dayOfCycle + 1;
 
   return (
     <View style={styles.wrapper}>
       {/* Navigation entre mois en haut */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.navButton}>
+        <Pressable onPress={() => changeMonth(-1)} style={styles.navButton}>
           <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
+        </Pressable>
         
         <Text style={styles.monthTitle}>
           {monthName.charAt(0).toUpperCase() + monthName.slice(1)}
         </Text>
         
-        <TouchableOpacity onPress={() => changeMonth(1)} style={styles.navButton}>
+        <Pressable onPress={() => changeMonth(1)} style={styles.navButton}>
           <Ionicons name="chevron-forward" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       {/* Roue circulaire du mois */}
@@ -94,33 +94,33 @@ const CalendrierCirculaire: React.FC<CalendrierCirculaireProps> = ({
           const y = center + radius * Math.sin(angle) - 15;
 
           const dateCell = new Date(year, month, dayNum);
-          const isSelected = selectedDate.toDateString() === dateCell.toDateString();
+          const isToday = today.toDateString() === dateCell.toDateString();
           const { phase: dayPhase } = getPhaseDataForDate(dateCell);
+          const isTodayPeriod = isToday && dayPhase.key === 'menstruelle';
 
           return (
-            <TouchableOpacity
+            <View
               key={dayNum}
-              activeOpacity={0.8}
-              onPress={() => {
-                setSelectedDate(dateCell);
-                if (onSelectDay) onSelectDay(dateCell);
-              }}
               style={[
                 styles.bead,
-                { left: x, top: y },
-                isSelected && { backgroundColor: dayPhase.base, transform: [{ scale: 1.25 }] },
+                { left: x, top: y, backgroundColor: isToday ? '#A78FB5' : dayPhase.base },
+                isToday && { transform: [{ scale: 1.25 }] },
+                isTodayPeriod && { borderWidth: 2.5, borderColor: '#E85A71' },
               ]}
             >
-              <Text style={[styles.beadText, isSelected && styles.beadTextActive]}>
+              <Text style={[
+                styles.beadText,
+                { color: (isToday || dayPhase.base !== '#FFFFFF') ? '#FFFFFF' : COLORS.textMain },
+              ]}>
                 {dayNum}
               </Text>
-            </TouchableOpacity>
+            </View>
           );
         })}
 
         {/* Textes au centre de la roue */}
         <View style={styles.centerContent}>
-          <Text style={styles.centerDayNumber}>{selectedDate.getDate()}</Text>
+          <Text style={styles.centerDayNumber}>{today.getDate()}</Text>
           <Text style={styles.centerPhaseTitle}>J{dayOfCycle} - {phase.label}</Text>
           <Text style={styles.centerSubText}>Phase: {phase.label} {phase.emoji}</Text>
           <Text style={styles.centerDaysLeft}>Il reste {daysUntilNext} jour{daysUntilNext > 1 ? 's' : ''}</Text>

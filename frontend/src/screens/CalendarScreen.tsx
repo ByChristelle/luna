@@ -1,37 +1,82 @@
-import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { useAuthStore } from '../../stores/authStore';
-import { calculateCycleMetrics } from '../utils/cycle';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import { useCycleStore } from '../../stores/cycleStore';
+import { useCycleHistoryStore } from '../../stores/cycleHistoryStore';
 import CalendrierMensuel from '../../components/ui/CalendrierMensuel';
+import Toast from '../../components/ui/Toast';
+import { COLORS, FONTS } from '../../constants/theme';
 
 export default function CalendarScreen() {
-  const { user, updatePeriodDate } = useAuthStore();
-  
-  
+  const { profile } = useCycleStore();
+  const { saveCycle, fetchLatestCycle, latestCycle, loading } = useCycleHistoryStore();
 
-  const handleSelectDate = (selectedDate: Date) => {
-    const formattedDate = selectedDate.toISOString().split('T')[0];
-    
-    // 1. Mise à jour immédiate dans Zustand (se répercutera sur la roue dans Home)
-    updatePeriodDate(formattedDate);
+  const [lastPeriodDate, setLastPeriodDate] = useState<string>(
+    profile?.last_period_date || new Date().toISOString().split('T')[0]
+  );
 
-    // 2. Envoi au backend (à décommenter si ton API est prête)
-    // api.patch('/profiles/me', { last_period_date: formattedDate });
+  // Toast state
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
   };
 
-  // Récupération des données du profil
-  const lastPeriodDate = (user as any)?.profile?.last_period_date || '2026-08-01';
-  const cycleLength = (user as any)?.profile?.cycle_length || 28;
-  const periodLength = (user as any)?.profile?.period_length || 5;
+  useEffect(() => {
+    fetchLatestCycle();
+  }, []);
+
+  useEffect(() => {
+    if (latestCycle?.period_start_date) {
+      setLastPeriodDate(latestCycle.period_start_date);
+    } else if (profile?.last_period_date) {
+      setLastPeriodDate(profile.last_period_date);
+    }
+  }, [latestCycle, profile]);
+
+  const handleSelectDate = async (selectedDate: Date) => {
+    const formattedDate = selectedDate.toISOString().split('T')[0];
+    setLastPeriodDate(formattedDate);
+
+    const result = await saveCycle(formattedDate);
+
+    if (result.success) {
+      showToast('Cycle sauvegardé avec succès !', 'success');
+    } else {
+      showToast(result.error || 'Impossible de sauvegarder le cycle.', 'error');
+      setLastPeriodDate(latestCycle?.period_start_date || profile?.last_period_date || formattedDate);
+    }
+  };
+
+  const cycleLength = parseInt(String(profile?.cycle_length || '28'), 10);
+  const periodLength = parseInt(String(profile?.period_length || '5'), 10);
 
   return (
     <View style={styles.container}>
-      <CalendrierMensuel 
-  periodLength={userOnboardingData.periodLength}
-  cycleLength={userOnboardingData.cycleLength}
-  lastPeriodDate={new Date(userOnboardingData.lastPeriodDate)}
-  onSelectDay={(date) => console.log(date)}
-/>
+      {/* Toast */}
+      <Toast
+        visible={toastVisible}
+        message={toastMessage}
+        type={toastType}
+        onHide={() => setToastVisible(false)}
+      />
+
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Sauvegarde...</Text>
+        </View>
+      )}
+
+      <CalendrierMensuel
+        lastPeriodDate={lastPeriodDate}
+        cycleLength={cycleLength}
+        periodLength={periodLength}
+        onSelectDate={handleSelectDate}
+      />
     </View>
   );
 }
@@ -39,8 +84,19 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justify: 'center',
+    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
+  },
+  loadingOverlay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  loadingText: {
+    fontSize: 13,
+    fontFamily: FONTS.regular,
+    color: COLORS.primary,
   },
 });

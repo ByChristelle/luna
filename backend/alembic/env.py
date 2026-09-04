@@ -9,6 +9,12 @@ from app.core.database import Base
 # Imports explicites de chaque modèle pour enregistrer leurs métadonnées
 from app.models.user import User  # Adapte si le nom de fichier est différent (ex: user_model.py)
 from app.models.profile import Profile
+from app.models.cycle import Cycle
+from app.models.message import Message
+from app.models.push_token import PushToken
+from app.models.notification_preference import NotificationPreference
+
+
 
 
 from logging.config import fileConfig
