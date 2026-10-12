@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -12,9 +12,10 @@ class User(Base):
     password = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     share_token = Column(String(255), nullable=True, unique=True, index=True)
+    has_completed_onboarding = Column(Boolean, default=False, server_default="false", nullable=False)
 
     profile = relationship("Profile", back_populates="user", uselist=False)
-    cycles=relationship("Cycle" , back_populates="user")
+    cycles = relationship("Cycle", back_populates="user")
     messages = relationship("Message", back_populates="user")
     push_tokens = relationship("PushToken", back_populates="user")
     notification_preferences = relationship("NotificationPreference", back_populates="user", uselist=False)

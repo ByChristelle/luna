@@ -11,10 +11,19 @@ router = APIRouter(prefix="/profiles", tags=["Profiles"])
 def save_onboarding(
     profile: ProfileCreate = Body(...), 
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user) # ID récupéré du token JWT
+    current_user = Depends(get_current_user)
 ):
     # Met à jour le profil s'il existe déjà, sinon le crée (Upsert)
-    return profile_controller.create_or_update_profile(db, profile, current_user.id)
+    result = profile_controller.create_or_update_profile(db, profile, current_user.id)
+
+    # Marquer l'onboarding comme complété en base
+    from app.models.user import User
+    db_user = db.query(User).filter(User.id == current_user.id).first()
+    if db_user:
+        db_user.has_completed_onboarding = True
+        db.commit()
+
+    return result
 
 @router.get("/me", response_model=ProfileResponse)
 def read_mine(

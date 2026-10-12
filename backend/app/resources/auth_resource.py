@@ -4,6 +4,7 @@ class UserResource(BaseModel):
     id: int
     name: str
     email: EmailStr
+    has_completed_onboarding: bool = False
 
     class Config:
         from_attributes = True
