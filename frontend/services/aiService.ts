@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '../stores/authStore';
 
-export const askLuna = async (
+export const  = async (
   userPrompt: string,
   cyclePhase: string = 'folliculaire',
   cycleDay: number = 1

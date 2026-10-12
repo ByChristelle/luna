@@ -21,7 +21,6 @@ import PublicNavbar from '../components/ui/PublicNavbar';
 import Toast from '../components/ui/Toast';
 import { useAuthStore } from '../stores/authStore';
 import { COLORS, FONTS } from '../constants/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack } from 'expo-router';
 
 export default function LoginScreen() {
@@ -33,15 +32,11 @@ export default function LoginScreen() {
   const [formError, setFormError] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
 
-  const navigateAfterAuth = async () => {
-    try {
-      const hasCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
-      if (hasCompleted === 'true') {
-        router.replace('/(tabs)');
-      } else {
-        router.replace('/(tabs)/onboarding');
-      }
-    } catch (err) {
+  const navigateAfterAuth = (userData?: any) => {
+    const userToCheck = userData || useAuthStore.getState().user;
+    if (userToCheck?.has_completed_onboarding) {
+      router.replace('/(tabs)');
+    } else {
       router.replace('/(tabs)/onboarding');
     }
   };

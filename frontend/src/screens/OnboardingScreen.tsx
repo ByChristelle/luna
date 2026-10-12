@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { styles } from './OnboardingScreen.styles';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useRouter } from 'expo-router';
 
@@ -62,7 +61,7 @@ export default function OnboardingScreen() {
     console.log('[Onboarding] résultat:', res);
 
     if (res.success) {
-      await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
+      // Plus besoin d'AsyncStorage — has_completed_onboarding est en base
       router.replace('/(tabs)');
     } else {
       console.log('[Onboarding] erreur soumission');

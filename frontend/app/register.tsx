@@ -28,18 +28,30 @@ export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword , setConfirmPassword]= useState('');
   const [formError, setFormError] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
 
   const handleRegister = async () => {
     setFormError('');
-    if (!name || !email || !password) {
+
+    if (!name || !email || !password || !confirmPassword) {
       setFormError('Veuillez remplir tous les champs.');
       return;
     }
+
+    if (password.length < 8) {
+      setFormError('Le mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setFormError('Les mots de passe ne sont pas identiques.');
+      return;
+    }
+
     const result = await register({ name, email, password });
     if (result.success) {
-      // Connexion automatique après inscription pour obtenir le token
       const loginResult = await login({ email, password });
       if (loginResult.success) {
         setToastVisible(true);
@@ -115,6 +127,14 @@ export default function RegisterScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+              />
+              <Input
+                label="Confirmer le mot de passe"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                // autoComplete="off"
               />
 
               <Button title="S'inscrire" onPress={handleRegister} loading={loading} />

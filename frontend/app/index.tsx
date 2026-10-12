@@ -22,21 +22,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Index() {
   const router = useRouter();
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
 
   useEffect(() => {
-    const checkAndRedirect = async () => {
-      if (token) {
-        const hasCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
-        if (hasCompleted === 'true') {
-          router.replace('/(tabs)');
-        } else {
-          router.replace('/(tabs)/onboarding');
-        }
+    if (token) {
+      if ((user as any)?.has_completed_onboarding) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(tabs)/onboarding');
       }
-    };
-    checkAndRedirect();
-  }, [token]);
+    }
+  }, [token, user]);
 
   // Loader pendant la vérification du token
   if (token === undefined) {

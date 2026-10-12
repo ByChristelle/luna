@@ -33,9 +33,18 @@ export const useOnboardingStore = create((set) => ({
       );
 
       set({ loading: false });
+
+      // Mettre à jour has_completed_onboarding dans le store auth
+      const currentUser = useAuthStore.getState().user;
+      if (currentUser) {
+        useAuthStore.setState({
+          user: { ...currentUser, has_completed_onboarding: true }
+        });
+      }
+
       return { success: true, data: response.data };
     } catch (err) {
-      console.log('[onboardingStore] erreur:', err.response?.status, err.response?.data);
+      console.log('[onboardingStore] erreur:', err.message, err.code, err.response?.status, err.response?.data);
       set({
         loading: false,
         error: err.response?.data?.detail || "Erreur lors de l'enregistrement",
@@ -44,44 +53,3 @@ export const useOnboardingStore = create((set) => ({
     }
   },
 }));
-
-
-// import { create } from 'zustand';
-// import { persist, createJSONStorage } from 'zustand/middleware';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
-// import api from '../services/api';
-
-// export const useOnboardingStore = create(
-//   persist(
-//     (set) => ({
-//       loading: false,
-//       error: null,
-//       profileData: null, // Données accessibles partout
-
-//       submitOnboarding: async (formData) => {
-//         set({ loading: true, error: null, profileData: formData }); // On garde formData en mémoire
-//         try {
-//           const response = await api.post('/profiles/onboarding', {
-//             goal: formData.goal,
-//             age: parseInt(formData.age, 10),
-//             last_period_date: formData.lastPeriod,
-//             cycle_length: parseInt(formData.cycleLength, 10),
-//             period_length: parseInt(formData.periodLength, 10),
-//             is_regular: true,
-//             flow: formData.flow,
-//             symptoms: JSON.stringify(formData.symptoms),
-//           });
-//           set({ loading: false });
-//           return { success: true, data: response.data };
-//         } catch (err) {
-//           set({ loading: false, error: err.response?.data?.detail || "Erreur" });
-//           return { success: false };
-//         }
-//       },
-//     }),
-//     {
-//       name: 'onboarding-storage',
-//       storage: createJSONStorage(() => AsyncStorage), // Sauvegarde auto sur le téléphone
-//     }
-//   )
-// );
